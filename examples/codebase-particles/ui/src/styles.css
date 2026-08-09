@@ -1,0 +1,34 @@
+:root {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #e9eef7;
+  background: #0b0e16;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 300px; min-height: 100vh; background: radial-gradient(circle at 50% 0%, #182036 0, #0b0e16 45%); }
+button, input { font: inherit; }
+main { padding: 20px; }
+.app-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+h1 { margin: 2px 0 0; font-size: 20px; letter-spacing: -0.02em; }
+.eyebrow { margin: 0; color: #7f8da8; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.status { padding: 5px 8px; border: 1px solid #30384a; border-radius: 999px; color: #738097; font-size: 11px; }
+.status.live { color: #70e6a0; border-color: #285b3d; background: #11281a; }
+section { border: 1px solid #252c3b; border-radius: 12px; background: rgba(17, 21, 32, .88); }
+.selection { min-height: 110px; padding: 16px; box-shadow: 0 16px 45px rgba(0, 0, 0, .24); }
+.selection h2 { margin: 9px 0 6px; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.selection > p:last-child { margin: 0; color: #9faac0; font-size: 12px; }
+.instructions { display: grid; gap: 8px; margin-top: 12px; padding: 12px 14px; }
+.instructions div { display: grid; grid-template-columns: 58px 1fr; align-items: center; color: #9faac0; font-size: 12px; }
+kbd { width: fit-content; padding: 3px 6px; border: 1px solid #384154; border-radius: 5px; color: #d7dfed; background: #1b2130; font-size: 10px; }
+.controls { display: grid; gap: 15px; margin-top: 12px; padding: 14px; }
+button { width: 100%; padding: 9px 11px; border: 1px solid #3b4560; border-radius: 8px; color: #dce6f7; background: #20283b; cursor: pointer; }
+button:hover { border-color: #6478a3; }
+button.active { border-color: #9667ff; color: #d8c8ff; background: #2a1e47; }
+button.secondary { background: transparent; color: #aab4c6; }
+.orbit-icon { margin-right: 6px; color: #bd92ff; }
+label { display: grid; gap: 9px; }
+label > span { display: flex; justify-content: space-between; color: #cfd7e6; font-size: 12px; }
+label output { color: #8390a7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+input[type="range"] { width: 100%; accent-color: #9c6cff; }
+footer { display: flex; justify-content: space-between; padding: 14px 3px 0; color: #69758c; font-size: 10px; }

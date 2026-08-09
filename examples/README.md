@@ -8,6 +8,7 @@ From the repository root:
 ```text
 pqo examples/hello-particle/hello-particle.pqo
 pqo examples/neon-flock/neon-flock.pqo
+pqo examples/codebase-particles/codebase-particles.pqo
 pqo examples/hello-crystal/crystal.pqo
 pqo build examples/marble-water/marble-water.pqo
 pqo examples/marble-water/marble-water.lmp
@@ -16,6 +17,9 @@ pqo examples/marble-water/marble-water.lmp
 The Crystal example is interactive: drag across the crystal to slice it, drag
 the black background to spin it, and scroll to zoom. The cut heals
 automatically.
+
+Codebase Particles renders the repository's source, configuration, and
+documentation files as five animated subsystem constellations.
 
 From inside an example directory:
 

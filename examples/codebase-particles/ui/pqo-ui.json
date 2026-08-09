@@ -1,0 +1,8 @@
+{
+  "framework": "vue3",
+  "dist": "dist",
+  "entry": "index.html",
+  "title": "Codebase Particles — Inspector",
+  "width": 340,
+  "height": 560
+}

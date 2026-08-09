@@ -1,0 +1,204 @@
+// Testable question:
+// Can the structure of this repository be understood as a living GPU-resident
+// constellation, with one particle per current source/configuration/doc file?
+
+pqo 0.1
+module codebase_particles
+target metal
+
+const repository.file_count: u32 = 181
+const layout.spring: f32<s^-2> = 2.8
+const layout.orbit: f32<s^-1> = 0.34
+const layout.drag: f32<s^-1> = 1.7
+const layout.motion: f32<m/s^2> = 0.035
+const layout.maximum_speed: f32<m/s> = 0.24
+const interaction.pointer_x: f32 = 0
+const interaction.pointer_y: f32 = 0
+const interaction.click_generation: f32 = 0
+const interaction.selection_radius: f32 = 0.055
+const interaction.hud_fps: f32 = 0
+const interaction.hud_gpu_mb: f32 = 0
+const camera.center_x: f32<m> = 0
+const camera.center_y: f32<m> = 0
+const camera.zoom: f32 = 1
+const camera.orbit_angle: f32 = 0
+const camera.orbit_selected: f32 = 0
+const camera.aspect: f32 = 1.333333
+
+stream files.position: f32x2<m> {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream files.anchor: f32x2<m> {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream files.velocity: f32x2<m/s> {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream files.group: f32 {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream files.weight: f32 {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream files.initialized: f32 {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream interaction.selected: f32 {
+  cap=1 len=1 buffers=1 access=rw storage=device
+  init=[0]
+}
+
+stream interaction.click_seen: f32 {
+  cap=1 len=1 buffers=1 access=rw storage=device
+  init=[0]
+}
+
+stream render.position: f32x2 {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream render.group: f32 {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream render.weight: f32 {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+stream render.selected: f32 {
+  cap=181 len=181 buffers=1 access=rw storage=device
+}
+
+// EXTERNAL METAL: deterministic repository layout, subsystem classification,
+// bounded motion, conditionals, trigonometry, and speed limiting.
+kernel organize_repository(
+  position: rw stream<f32x2,m>,
+  anchor: rw stream<f32x2,m>,
+  velocity: rw stream<f32x2,m/s>,
+  group: rw stream<f32>,
+  weight: rw stream<f32>,
+  initialized: rw stream<f32>,
+  file_count: in value<u32>,
+  spring: in value<f32,s^-2>,
+  orbit: in value<f32,s^-1>,
+  drag: in value<f32,s^-1>,
+  motion: in value<f32,m/s^2>,
+  maximum_speed: in value<f32,m/s>,
+  dt: in value<f32,s>
+) extern metal {
+  source="kernels/codebase_particles.metal"
+  entry="codebase_particles_organize"
+}
+
+// EXTERNAL METAL: one invocation performs deterministic nearest-particle
+// hit-testing in the same camera space used by the renderer.
+kernel select_file(
+  position: in all stream<f32x2,m>,
+  selected: rw all stream<f32>,
+  click_seen: rw all stream<f32>,
+  pointer_x: in value<f32>,
+  pointer_y: in value<f32>,
+  click_generation: in value<f32>,
+  center_x: in value<f32,m>,
+  center_y: in value<f32,m>,
+  zoom: in value<f32>,
+  orbit_angle: in value<f32>,
+  orbit_selected: in value<f32>,
+  aspect: in value<f32>,
+  selection_radius: in value<f32>
+) extern metal {
+  source="kernels/codebase_particles.metal"
+  entry="codebase_particles_select"
+}
+
+// EXTERNAL METAL: camera projection, zoom-to-cursor, and selected-particle
+// orbit transform stay explicit because views currently bind streams only.
+kernel project_repository(
+  world_position: in all stream<f32x2,m>,
+  group: in stream<f32>,
+  weight: in stream<f32>,
+  selected: in all stream<f32>,
+  render_position: out stream<f32x2>,
+  render_group: out stream<f32>,
+  render_weight: out stream<f32>,
+  render_selected: out stream<f32>,
+  center_x: in value<f32,m>,
+  center_y: in value<f32,m>,
+  zoom: in value<f32>,
+  orbit_angle: in value<f32>,
+  orbit_selected: in value<f32>,
+  aspect: in value<f32>
+) extern metal {
+  source="kernels/codebase_particles.metal"
+  entry="codebase_particles_project"
+}
+
+pass organize = organize_repository(
+  position=files.position
+  anchor=files.anchor
+  velocity=files.velocity
+  group=files.group
+  weight=files.weight
+  initialized=files.initialized
+  file_count=repository.file_count
+  spring=layout.spring
+  orbit=layout.orbit
+  drag=layout.drag
+  motion=layout.motion
+  maximum_speed=layout.maximum_speed
+  dt=simulation.fixed_dt
+) over files.position
+
+pass select = select_file(
+  position=files.position
+  selected=interaction.selected
+  click_seen=interaction.click_seen
+  pointer_x=interaction.pointer_x
+  pointer_y=interaction.pointer_y
+  click_generation=interaction.click_generation
+  center_x=camera.center_x
+  center_y=camera.center_y
+  zoom=camera.zoom
+  orbit_angle=camera.orbit_angle
+  orbit_selected=camera.orbit_selected
+  aspect=camera.aspect
+  selection_radius=interaction.selection_radius
+) over interaction.selected
+
+pass project = project_repository(
+  world_position=files.position
+  group=files.group
+  weight=files.weight
+  selected=interaction.selected
+  render_position=render.position
+  render_group=render.group
+  render_weight=render.weight
+  render_selected=render.selected
+  center_x=camera.center_x
+  center_y=camera.center_y
+  zoom=camera.zoom
+  orbit_angle=camera.orbit_angle
+  orbit_selected=camera.orbit_selected
+  aspect=camera.aspect
+) over render.position
+
+view repository_view(
+  position=render.position
+  group=render.group
+  weight=render.weight
+  selected=render.selected
+) extern metal {
+  source="shaders/codebase_particles.metal"
+  entry="codebase_particles_pipeline"
+}
+
+flow simulation rate=120hz {
+  organize -> select -> project
+  draw repository_view after project
+}
