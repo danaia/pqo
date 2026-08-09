@@ -1,0 +1,8 @@
+{
+  "framework": "vue3",
+  "dist": "dist",
+  "entry": "index.html",
+  "title": "URBAN / 50K — Population mobility model",
+  "width": 1440,
+  "height": 900
+}

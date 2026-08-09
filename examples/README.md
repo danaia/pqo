@@ -25,6 +25,11 @@ wave field and reveal its probability current as phase-colored light trails.
 Codebase Particles renders the repository's source, configuration, and
 documentation files as five animated subsystem constellations.
 
+URBAN / 50K begins a deterministic human-population mobility model with a
+browser-rendered 3D city, 50,000 policy-driven agents, affect and transport
+views, three city layouts, timeline controls, and particle inspection. Run its
+research UI with `cd examples/urban-50k/ui && npm install && npm run dev`.
+
 From inside an example directory:
 
 ```text
