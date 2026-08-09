@@ -1,0 +1,168 @@
+// Testable question:
+// Can a living Stentor / Holophrya encounter be expressed as an explicit,
+// GPU-resident point-cloud system with membrane mechanics, Brownian motion,
+// chemotaxis, rupture transport, feeding, and repair?
+
+pqo 0.1
+module stentor_breach
+target metal
+
+const particles.count: u32 = 49600
+const interaction.playing: f32 = 1
+const interaction.phase: f32 = 0
+const interaction.particle_density: f32 = 0.25
+const interaction.membrane_tension: f32 = 0.72
+const interaction.brownian_motion: f32 = 0.42
+const interaction.chemotaxis: f32 = 0.68
+const interaction.repair_rate: f32 = 0.58
+const interaction.reset_scene: f32 = 0
+const interaction.hud_fps: f32 = 0
+const interaction.hud_gpu_mb: f32 = 0
+const interaction.hud_gpu_frame_ms: f32 = 0
+const camera.aspect: f32 = 1.6
+const camera.yaw: f32 = -0.16
+const camera.pitch: f32 = 0.08
+const camera.distance: f32<m> = 4.25
+
+stream clock.state: f32x4 {
+  cap=1 len=1 buffers=1 access=rw storage=device
+  init=[[0,0,0,0]]
+}
+
+stream particles.position: f32x3<m> {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream particles.velocity: f32x3<m/s> {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream particles.home: f32x3<m> {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream particles.role: f32 {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream particles.seed: f32 {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream particles.generation: f32 {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream particles.color: f32x4 {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream particles.radius: f32<m> {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+
+stream render.position: f32x3<m> {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream render.color: f32x4 {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+stream render.radius: f32<m> {
+  cap=49600 len=49600 buffers=1 access=rw storage=device
+}
+
+kernel advance_clock(
+  state: rw all stream<f32x4>,
+  playing: in value<f32>,
+  selected_phase: in value<f32>,
+  reset_scene: in value<f32>,
+  dt: in value<f32,s>
+) extern metal {
+  source="kernels/stentor_breach.metal"
+  entry="stentor_advance_clock"
+}
+
+kernel evolve_particles(
+  position: rw stream<f32x3,m>,
+  velocity: rw stream<f32x3,m/s>,
+  home: rw stream<f32x3,m>,
+  role: rw stream<f32>,
+  seed: rw stream<f32>,
+  generation: rw stream<f32>,
+  color: rw stream<f32x4>,
+  radius: rw stream<f32,m>,
+  clock_state: in all stream<f32x4>,
+  particle_density: in value<f32>,
+  membrane_tension: in value<f32>,
+  brownian_motion: in value<f32>,
+  chemotaxis: in value<f32>,
+  repair_rate: in value<f32>,
+  dt: in value<f32,s>
+) extern metal {
+  source="kernels/stentor_breach.metal"
+  entry="stentor_evolve_particles"
+}
+
+kernel project_particles(
+  world_position: in stream<f32x3,m>,
+  world_color: in stream<f32x4>,
+  world_radius: in stream<f32,m>,
+  render_position: out stream<f32x3,m>,
+  render_color: out stream<f32x4>,
+  render_radius: out stream<f32,m>,
+  clock_state: in all stream<f32x4>,
+  aspect: in value<f32>,
+  yaw: in value<f32>,
+  pitch: in value<f32>,
+  distance: in value<f32,m>
+) extern metal {
+  source="kernels/stentor_breach.metal"
+  entry="stentor_project_particles"
+}
+
+pass clock = advance_clock(
+  state=clock.state
+  playing=interaction.playing
+  selected_phase=interaction.phase
+  reset_scene=interaction.reset_scene
+  dt=simulation.fixed_dt
+) over clock.state
+
+pass physics = evolve_particles(
+  position=particles.position
+  velocity=particles.velocity
+  home=particles.home
+  role=particles.role
+  seed=particles.seed
+  generation=particles.generation
+  color=particles.color
+  radius=particles.radius
+  clock_state=clock.state
+  particle_density=interaction.particle_density
+  membrane_tension=interaction.membrane_tension
+  brownian_motion=interaction.brownian_motion
+  chemotaxis=interaction.chemotaxis
+  repair_rate=interaction.repair_rate
+  dt=simulation.fixed_dt
+) over particles.position
+
+pass camera = project_particles(
+  world_position=particles.position
+  world_color=particles.color
+  world_radius=particles.radius
+  render_position=render.position
+  render_color=render.color
+  render_radius=render.radius
+  clock_state=clock.state
+  aspect=camera.aspect
+  yaw=camera.yaw
+  pitch=camera.pitch
+  distance=camera.distance
+) over render.position
+
+view specimen(
+  color=render.color
+  position=render.position
+  radius=render.radius
+) extern metal {
+  source="shaders/stentor_breach.metal"
+  entry="stentor_breach_pipeline"
+}
+
+flow simulation rate=120hz {
+  clock -> physics -> camera
+  draw specimen after camera
+}
