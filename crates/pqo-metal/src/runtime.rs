@@ -2187,7 +2187,7 @@ impl RuntimeState {
         attachment.set_load_action(MTLLoadAction::Clear);
         let clear = match self.validated.graph().name.as_str() {
             "hello_worm" => MTLClearColor::new(0.008, 0.018, 0.014, 1.0),
-            "neon_flock" => MTLClearColor::new(0.003, 0.005, 0.015, 1.0),
+            "neon_flock" | "quantum_field" => MTLClearColor::new(0.003, 0.005, 0.015, 1.0),
             _ => MTLClearColor::new(0.025, 0.03, 0.055, 1.0),
         };
         attachment.set_clear_color(clear);
@@ -3034,7 +3034,10 @@ fn build_pipelines(
             .object_at(0)
             .unwrap()
             .set_pixel_format(MTLPixelFormat::BGRA8Unorm);
-        if view.implementation.entry == "neon_flock_pipeline" {
+        if matches!(
+            view.implementation.entry.as_str(),
+            "neon_flock_pipeline" | "quantum_field_pipeline"
+        ) {
             let attachment = descriptor.color_attachments().object_at(0).unwrap();
             attachment.set_blending_enabled(true);
             attachment.set_source_rgb_blend_factor(MTLBlendFactor::SourceAlpha);

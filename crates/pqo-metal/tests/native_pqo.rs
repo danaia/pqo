@@ -8,6 +8,8 @@ const SOURCE: &str = include_str!("../../../examples/hello-particle/hello-partic
 const CRYSTAL_SOURCE: &str = include_str!("../../../examples/hello-crystal/crystal.pqo");
 const NEON_FLOCK_SOURCE: &str = include_str!("../../../examples/neon-flock/neon-flock.pqo");
 const MARBLE_WATER_SOURCE: &str = include_str!("../../../examples/marble-water/marble-water.pqo");
+const QUANTUM_FIELD_SOURCE: &str =
+    include_str!("../../../examples/quantum-field/quantum-field.pqo");
 
 #[test]
 fn native_pqo_kernel_generates_compiles_and_executes_metal() {
@@ -142,6 +144,44 @@ fn marble_water_compiles_and_executes_the_particle_simulation() {
         "kernels/marble_water.metal",
         "pqo://generated/marble_water/integrate_water.metal",
         "shaders/marble_water.metal",
+    ] {
+        assert!(
+            result
+                .runtime
+                .shader_hashes
+                .iter()
+                .any(|shader| shader.source_path == source),
+            "missing shader identity for {source}"
+        );
+    }
+}
+
+#[test]
+fn quantum_field_compiles_and_executes_native_and_external_metal() {
+    let graph = parse(QUANTUM_FIELD_SOURCE).expect("quantum field source must parse");
+    let validated = Validator::validate(&graph)
+        .validated
+        .expect("quantum field graph must validate");
+    let result = MetalRuntime::benchmark_project(
+        validated,
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/quantum-field"),
+        BenchmarkConfig {
+            mode: BenchmarkMode::Rendered,
+            runner: BenchmarkRunner::PqoPlan,
+            warmup_ticks: 1,
+            sample_ticks: 1,
+            ..BenchmarkConfig::default()
+        },
+    )
+    .expect("quantum field Metal must compile, execute, and render");
+
+    assert_eq!(result.sample_ticks, 1);
+    for source in [
+        "pqo://generated/quantum_field/advance_clock.metal",
+        "kernels/quantum_field.metal",
+        "pqo://generated/quantum_field/advance_quanta.metal",
+        "pqo://generated/quantum_field/evolve_trails.metal",
+        "shaders/quantum_field.metal",
     ] {
         assert!(
             result

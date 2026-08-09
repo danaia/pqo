@@ -1,0 +1,174 @@
+// Testable question:
+// Can a bounded GPU particle pool continuously importance-sample a complex
+// scalar field and reveal its probability current without CPU-side spawning?
+//
+// This is a physically inspired visualization of wave interference and the
+// probability current j / |psi|^2, not a full relativistic QFT calculation.
+
+pqo 0.1
+module quantum_field
+target metal
+
+const quanta.population: u32 = 32768
+const field.half_extent: f32<m> = 0.98
+const field.packet_sigma: f32<m> = 0.32
+const field.flow_gain: f32 = 0.085
+const field.velocity_response: f32<s^-1> = 7.0
+const field.maximum_speed: f32<m/s> = 0.72
+const field.density_floor: f32 = 0.0025
+const field.spawn_candidates: u32 = 8
+
+const quanta.minimum_lifetime: f32<s> = 3.5
+const quanta.lifetime_span: f32<s> = 6.5
+const quanta.drag: f32 = 0.9985
+
+const trail.memory: f32 = 0.86
+const trail.follow: f32 = 0.14
+
+stream field.time: f32<s> {
+  cap=1 len=1 buffers=1 access=rw storage=device
+}
+
+stream quanta.position: f32x2<m> {
+  cap=32768 len=32768 buffers=1 access=rw storage=device
+}
+
+stream quanta.velocity: f32x2<m/s> {
+  cap=32768 len=32768 buffers=1 access=rw storage=device
+}
+
+stream quanta.trail_position: f32x2<m> {
+  cap=32768 len=32768 buffers=1 access=rw storage=device
+}
+
+stream quanta.age: f32<s> {
+  cap=32768 len=32768 buffers=1 access=rw storage=device
+}
+
+stream quanta.lifetime: f32<s> {
+  cap=32768 len=32768 buffers=1 access=rw storage=device
+}
+
+stream quanta.intensity: f32 {
+  cap=32768 len=32768 buffers=1 access=rw storage=device
+}
+
+stream quanta.phase: f32 {
+  cap=32768 len=32768 buffers=1 access=rw storage=device
+}
+
+// NATIVE PQO: one shared, GPU-resident simulation clock.
+kernel advance_clock(
+  time: rw stream<f32,s>,
+  dt: in value<f32,s>
+) each i {
+  time[i] += dt;
+}
+
+// EXTERNAL METAL: complex wave-packet superposition, analytic field gradient,
+// probability current, and deterministic importance-sampled respawning.
+kernel sample_quantum_field(
+  position: rw stream<f32x2,m>,
+  velocity: rw stream<f32x2,m/s>,
+  trail_position: rw stream<f32x2,m>,
+  age: rw stream<f32,s>,
+  lifetime: rw stream<f32,s>,
+  intensity: out stream<f32>,
+  phase: out stream<f32>,
+  time: in all stream<f32,s>,
+  population: in value<u32>,
+  half_extent: in value<f32,m>,
+  packet_sigma: in value<f32,m>,
+  flow_gain: in value<f32>,
+  velocity_response: in value<f32,s^-1>,
+  maximum_speed: in value<f32,m/s>,
+  density_floor: in value<f32>,
+  spawn_candidates: in value<u32>,
+  minimum_lifetime: in value<f32,s>,
+  lifetime_span: in value<f32,s>,
+  dt: in value<f32,s>
+) extern metal {
+  source="kernels/quantum_field.metal"
+  entry="quantum_field_sample_main"
+}
+
+// NATIVE PQO: typed particle integration and lifetime evolution.
+kernel advance_quanta(
+  position: rw stream<f32x2,m>,
+  velocity: rw stream<f32x2,m/s>,
+  age: rw stream<f32,s>,
+  drag: in value<f32>,
+  dt: in value<f32,s>
+) each i {
+  velocity[i] *= drag;
+  position[i] += velocity[i] * dt;
+  age[i] += dt;
+}
+
+// NATIVE PQO: an exponential history position makes field flow legible.
+kernel evolve_trails(
+  trail_position: rw stream<f32x2,m>,
+  position: in stream<f32x2,m>,
+  memory: in value<f32>,
+  follow: in value<f32>
+) each i {
+  trail_position[i] *= memory;
+  trail_position[i] += position[i] * follow;
+}
+
+pass tick_clock = advance_clock(
+  time=field.time
+  dt=simulation.fixed_dt
+) over field.time
+
+pass sample_field = sample_quantum_field(
+  position=quanta.position
+  velocity=quanta.velocity
+  trail_position=quanta.trail_position
+  age=quanta.age
+  lifetime=quanta.lifetime
+  intensity=quanta.intensity
+  phase=quanta.phase
+  time=field.time
+  population=quanta.population
+  half_extent=field.half_extent
+  packet_sigma=field.packet_sigma
+  flow_gain=field.flow_gain
+  velocity_response=field.velocity_response
+  maximum_speed=field.maximum_speed
+  density_floor=field.density_floor
+  spawn_candidates=field.spawn_candidates
+  minimum_lifetime=quanta.minimum_lifetime
+  lifetime_span=quanta.lifetime_span
+  dt=simulation.fixed_dt
+) over quanta.position
+
+pass advance = advance_quanta(
+  position=quanta.position
+  velocity=quanta.velocity
+  age=quanta.age
+  drag=quanta.drag
+  dt=simulation.fixed_dt
+) over quanta.position
+
+pass remember = evolve_trails(
+  trail_position=quanta.trail_position
+  position=quanta.position
+  memory=trail.memory
+  follow=trail.follow
+) over quanta.position
+
+view quantum_view(
+  position=quanta.position
+  trail_position=quanta.trail_position
+  intensity=quanta.intensity
+  phase=quanta.phase
+) extern metal {
+  source="shaders/quantum_field.metal"
+  entry="quantum_field_pipeline"
+}
+
+flow simulation rate=120hz {
+  tick_clock -> sample_field -> advance -> remember
+  draw quantum_view after remember
+}
